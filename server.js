@@ -1,10 +1,11 @@
-/**
- * ============================================================================
- * GUESS THE WORD - MULTIPLAYER REAL-TIME WEB GAME
- * Single-file Express + Socket.IO + Vanilla JS Application
- * Deployment Ready for Render / Heroku / Node.js Host
- * ============================================================================
- */
+/* ============================================================================
+   GUESS THE WORD — Real-time Multiplayer Party Game
+   Single-file production server: Express + Socket.IO + embedded client
+   Run:  npm install express socket.io
+         node server.js
+   ============================================================================ */
+
+'use strict';
 
 const express = require('express');
 const http = require('http');
@@ -13,28 +14,293 @@ const { Server } = require('socket.io');
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server, {
-  cors: { origin: "*" },
+  cors: { origin: '*' },
   pingInterval: 10000,
-  pingTimeout: 5000
+  pingTimeout: 8000
 });
 
 const PORT = process.env.PORT || 3000;
 
-// ============================================================================
-// 1. WORD DATABASE (Categorized & Difficulty Classified)
-// ============================================================================
-const WORD_DATABASE = [
-  // --- GENERAL ---
-  { word: "CLOCKS", category: "General", difficulty: "Easy", hints: ["Keeps track of time", "Has hands and a face", "Found on walls or wrists"] },
-  { word: "PUZZLE", category: "General", difficulty: "Easy", hints: ["A game of problem solving", "Contains fitting pieces", "Jigsaw is a famous type"] },
-  { word: "MIRROR", category: "General", difficulty: "Easy", hints: ["Reflects your image", "Made of silvered glass", "Vampires don't show up here"] },
-  { word: "UMBRELLA", category: "General", difficulty: "Medium", hints: ["Used during bad weather", "Protects you from getting wet", "Furls into a compact cylinder"] },
-  { word: "CALENDAR", category: "General", difficulty: "Medium", hints: ["Tracks days and months", "Hangs on wall or in phones", "Has 365 days charted"] },
-  { word: "LABYRINTH", category: "General", difficulty: "Hard", hints: ["A complex maze", "Mythological home of the Minotaur", "Hard to navigate out of"] },
-  { word: "PARADOX", category: "General", difficulty: "Hard", hints: ["A self-contradictory statement", "Grandfather concept in time travel", "Seems impossible yet true"] },
+/* ============================================================================
+   SECTION 1: WORD DATABASE
+   Every entry: { word, category, difficulty, hints:[h1,h2,h3] }
+   Categories: general, science, technology, geography, history, sports,
+               movies, space, food, animals
+   Difficulty: easy, medium, hard
+   ("mixed" difficulty/category are resolved at query time — see getWordPool)
+   ============================================================================ */
 
-  // --- SCIENCE ---
-  { word: "ATOM", category: "Science", difficulty: "Easy", hints: ["Basic unit of matter", "Contains protons and neutrons", "Combines to form molecules"] },
+const WORD_DB = [];
+
+function addWords(category, difficulty, entries) {
+  for (const e of entries) {
+    WORD_DB.push({
+      word: e[0].toUpperCase(),
+      category,
+      difficulty,
+      hints: [e[1], e[2], e[3]]
+    });
+  }
+}
+
+/* ---------------------------- GENERAL ---------------------------- */
+addWords('general', 'easy', [
+  ['CHAIR', 'Furniture', 'You sit on it', 'Has four legs usually'],
+  ['TABLE', 'Furniture', 'Flat surface on legs', 'You eat meals on it'],
+  ['PENCIL', 'Writing tool', 'Made of wood and graphite', 'Has an eraser on top'],
+  ['WINDOW', 'Part of a house', 'Lets light in', 'Made of glass'],
+  ['MIRROR', 'Household item', 'Shows your reflection', 'Can be broken by bad luck superstition'],
+  ['BOTTLE', 'Container', 'Holds liquid', 'Often made of plastic or glass'],
+  ['UMBRELLA', 'Rain gear', 'Keeps you dry', 'Opens up like a canopy'],
+  ['BLANKET', 'Bedding', 'Keeps you warm', 'You wrap yourself in it'],
+  ['CANDLE', 'Light source', 'Made of wax', 'Has a wick that burns'],
+  ['LADDER', 'Climbing tool', 'Has rungs', 'Used to reach high places']
+]);
+addWords('general', 'medium', [
+  ['CALENDAR', 'Time tool', 'Shows days and months', 'Hangs on a wall'],
+  ['TELESCOPE', 'Viewing device', 'Used to see far away', 'Astronomers use it'],
+  ['ENVELOPE', 'Mail item', 'Holds a letter', 'You seal it shut'],
+  ['COMPASS', 'Direction tool', 'Has a needle', 'Points north'],
+  ['NOTEBOOK', 'Writing item', 'Has many pages', 'Students use it'],
+  ['STAIRCASE', 'Structure', 'Connects floors', 'Made of steps'],
+  ['KEYBOARD', 'Input device', 'Has many keys', 'Used to type'],
+  ['MICROWAVE', 'Kitchen appliance', 'Heats food fast', 'Uses radiation waves'],
+  ['SUITCASE', 'Travel item', 'Holds clothes', 'You pack it for a trip'],
+  ['THERMOSTAT', 'Climate device', 'Controls temperature', 'Found on walls']
+]);
+addWords('general', 'hard', [
+  ['METRONOME', 'Music device', 'Keeps a steady beat', 'Used by musicians practicing'],
+  ['KALEIDOSCOPE', 'Optical toy', 'Shows changing patterns', 'You look through one end'],
+  ['KILN', 'Heating chamber', 'Used to fire pottery', 'Reaches very high temperatures'],
+  ['ABACUS', 'Counting tool', 'Uses beads on rods', 'Ancient calculator'],
+  ['SUNDIAL', 'Timekeeping device', 'Uses a shadow', 'Relies on the sun'],
+  ['SCAFFOLDING', 'Construction structure', 'Temporary framework', 'Workers stand on it'],
+  ['CHANDELIER', 'Lighting fixture', 'Hangs from a ceiling', 'Often has crystals'],
+  ['TAPESTRY', 'Woven artwork', 'Hangs on a wall', 'Tells a story in threads'],
+  ['GYROSCOPE', 'Spinning device', 'Resists changes in orientation', 'Used in navigation systems'],
+  ['LABYRINTH', 'Complex structure', 'Full of winding paths', 'Easy to get lost in']
+]);
+
+/* ---------------------------- SCIENCE ---------------------------- */
+addWords('science', 'easy', [
+  ['ATOM', 'Basic unit', 'Smallest unit of matter', 'Has protons and electrons'],
+  ['GRAVITY', 'Force', 'Pulls things down', 'Keeps you on the ground'],
+  ['MAGNET', 'Object', 'Attracts metal', 'Has two poles'],
+  ['OXYGEN', 'Gas', 'You breathe it', 'Chemical symbol O'],
+  ['VOLCANO', 'Landform', 'Erupts with lava', 'Found on tectonic plates'],
+  ['SKELETON', 'Body structure', 'Made of bones', 'Supports your body'],
+  ['BACTERIA', 'Microorganism', 'Too small to see', 'Some cause disease'],
+  ['ENERGY', 'Physical quantity', 'Powers motion', 'Comes in many forms'],
+  ['CRYSTAL', 'Solid structure', 'Has a repeating pattern', 'Salt forms these'],
+  ['VIRUS', 'Pathogen', 'Needs a host to reproduce', 'Causes infections']
+]);
+addWords('science', 'medium', [
+  ['MOLECULE', 'Chemistry unit', 'Made of atoms bonded together', 'Water is one example'],
+  ['ECOSYSTEM', 'Biology term', 'Living things and environment together', 'Includes predators and prey'],
+  ['ENZYME', 'Biological catalyst', 'Speeds up reactions', 'Made of protein'],
+  ['PHOTOSYNTHESIS', 'Plant process', 'Converts sunlight to energy', 'Produces oxygen'],
+  ['ELECTRON', 'Subatomic particle', 'Negatively charged', 'Orbits the nucleus'],
+  ['MITOCHONDRIA', 'Cell part', 'Powerhouse of the cell', 'Produces energy'],
+  ['VACCINE', 'Medical treatment', 'Trains the immune system', 'Prevents disease'],
+  ['GENOME', 'Genetic term', 'Complete set of DNA', 'Unique to each organism'],
+  ['ISOTOPE', 'Chemistry term', 'Variant of an element', 'Differs in neutron count'],
+  ['CATALYST', 'Chemistry term', 'Speeds up a reaction', 'Not consumed in the process']
+]);
+addWords('science', 'hard', [
+  ['ENTROPY', 'Thermodynamics term', 'Measure of disorder', 'Always increases in a closed system'],
+  ['QUANTUM', 'Physics term', 'Smallest discrete unit', 'Basis of quantum mechanics'],
+  ['ELECTROLYSIS', 'Chemical process', 'Uses electric current', 'Splits compounds apart'],
+  ['SUPERCONDUCTOR', 'Material', 'Zero electrical resistance', 'Works at very low temperatures'],
+  ['CHROMOSOME', 'Genetic structure', 'Carries genes', 'Humans have 46'],
+  ['NEUROTRANSMITTER', 'Chemical messenger', 'Sends signals between neurons', 'Dopamine is one example'],
+  ['SPECTROSCOPY', 'Analysis method', 'Studies light and matter', 'Identifies chemical composition'],
+  ['THERMODYNAMICS', 'Physics branch', 'Studies heat and energy', 'Has four fundamental laws'],
+  ['POLYMERASE', 'Enzyme type', 'Builds nucleic acid chains', 'Essential for DNA replication'],
+  ['RADIOACTIVITY', 'Nuclear phenomenon', 'Emission of particles or rays', 'Discovered by Marie Curie']
+]);
+
+/* ---------------------------- TECHNOLOGY ---------------------------- */
+addWords('technology', 'easy', [
+  ['COMPUTER', 'Device', 'You type on it', 'Runs software'],
+  ['INTERNET', 'Network', 'Connects the world', 'You browse it'],
+  ['ROBOT', 'Machine', 'Can be programmed', 'Often looks mechanical'],
+  ['BATTERY', 'Power source', 'Stores energy', 'Needs recharging'],
+  ['CAMERA', 'Device', 'Captures images', 'Has a lens'],
+  ['PRINTER', 'Device', 'Puts ink on paper', 'Connects to a computer'],
+  ['HEADPHONES', 'Audio device', 'You wear them on your ears', 'Used to listen privately'],
+  ['TABLET', 'Device', 'Touchscreen computer', 'Smaller than a laptop'],
+  ['ROUTER', 'Networking device', 'Broadcasts WiFi', 'Sits near your modem'],
+  ['DRONE', 'Flying device', 'Controlled remotely', 'Often has a camera']
+]);
+addWords('technology', 'medium', [
+  ['ALGORITHM', 'Programming term', 'A set of steps to solve a problem', 'Used in every program'],
+  ['DATABASE', 'Storage system', 'Organizes data', 'Queried with a language like SQL'],
+  ['FIREWALL', 'Security system', 'Blocks unwanted traffic', 'Protects a network'],
+  ['ENCRYPTION', 'Security process', 'Scrambles data', 'Needs a key to reverse'],
+  ['BANDWIDTH', 'Networking term', 'Measures data capacity', 'Affects internet speed'],
+  ['PROCESSOR', 'Hardware part', 'The brain of a computer', 'Also called a CPU'],
+  ['BLUETOOTH', 'Wireless standard', 'Connects devices short range', 'Named after a Viking king'],
+  ['SOFTWARE', 'Programs', 'Runs on hardware', 'Includes apps and operating systems'],
+  ['MALWARE', 'Security threat', 'Malicious software', 'Can steal or damage data'],
+  ['INTERFACE', 'Design term', 'How a user interacts with a system', 'Can be graphical or text-based']
+]);
+addWords('technology', 'hard', [
+  ['MICROPROCESSOR', 'Hardware component', 'Integrated circuit brain', 'Found in nearly every device'],
+  ['BLOCKCHAIN', 'Ledger technology', 'Distributed and immutable', 'Underlies cryptocurrencies'],
+  ['CRYPTOGRAPHY', 'Security field', 'Studies secure communication', 'Uses complex mathematics'],
+  ['VIRTUALIZATION', 'Computing concept', 'Runs machines inside machines', 'Used heavily in cloud computing'],
+  ['MIDDLEWARE', 'Software layer', 'Connects different applications', 'Sits between OS and apps'],
+  ['MULTITHREADING', 'Programming concept', 'Runs tasks concurrently', 'Improves processor efficiency'],
+  ['AUTHENTICATION', 'Security process', 'Verifies identity', 'Often needs a password or token'],
+  ['LATENCY', 'Networking term', 'Delay in data transfer', 'Measured in milliseconds'],
+  ['KUBERNETES', 'Orchestration platform', 'Manages containers', 'Originally built by Google'],
+  ['REFACTORING', 'Coding practice', 'Restructures code without changing behavior', 'Improves maintainability']
+]);
+
+/* ---------------------------- GEOGRAPHY ---------------------------- */
+addWords('geography', 'easy', [
+  ['RIVER', 'Landform', 'Flows to the sea', 'The Nile is one'],
+  ['MOUNTAIN', 'Landform', 'Very tall and rocky', 'Everest is the tallest'],
+  ['DESERT', 'Biome', 'Very dry', 'The Sahara is famous'],
+  ['ISLAND', 'Landform', 'Surrounded by water', 'Hawaii is made of these'],
+  ['OCEAN', 'Body of water', 'Very large and salty', 'The Pacific is the biggest'],
+  ['VALLEY', 'Landform', 'Low area between hills', 'Often has a river running through'],
+  ['FOREST', 'Biome', 'Full of trees', 'The Amazon is the largest'],
+  ['GLACIER', 'Ice formation', 'Moves very slowly', 'Found near the poles'],
+  ['CANYON', 'Landform', 'Deep and narrow', 'The Grand one is in Arizona'],
+  ['PENINSULA', 'Landform', 'Surrounded by water on three sides', 'Florida is one example']
+]);
+addWords('geography', 'medium', [
+  ['CONTINENT', 'Landmass', 'There are seven of them', 'Africa is the second largest'],
+  ['EQUATOR', 'Imaginary line', 'Divides the globe in half', 'Zero degrees latitude'],
+  ['ARCHIPELAGO', 'Landform', 'A chain of islands', 'The Philippines is one example'],
+  ['PLATEAU', 'Landform', 'A raised flat area', 'Sometimes called a tableland'],
+  ['TUNDRA', 'Biome', 'Cold and treeless', 'Found near the Arctic Circle'],
+  ['DELTA', 'Landform', 'Forms where a river meets the sea', 'Often shaped like a triangle'],
+  ['HEMISPHERE', 'Geographic division', 'Half of the Earth', 'Northern and Southern are examples'],
+  ['SAVANNA', 'Biome', 'Grassy with scattered trees', 'Home to lions and giraffes'],
+  ['FJORD', 'Landform', 'A narrow inlet with steep sides', 'Common in Norway'],
+  ['ISTHMUS', 'Landform', 'A narrow strip of land', 'Connects two larger landmasses']
+]);
+addWords('geography', 'hard', [
+  ['MERIDIAN', 'Geographic line', 'Runs from pole to pole', 'The Prime one is at zero degrees'],
+  ['TECTONIC', 'Geologic term', 'Relates to Earth\'s plates', 'Causes earthquakes when plates shift'],
+  ['ESTUARY', 'Landform', 'Where a river meets the tide', 'Mixes fresh and salt water'],
+  ['ATOLL', 'Landform', 'A ring-shaped coral reef', 'Often encloses a lagoon'],
+  ['STEPPE', 'Biome', 'Vast dry grassland', 'Common across Central Asia'],
+  ['CARTOGRAPHY', 'Field of study', 'The art of making maps', 'Cartographers practice this'],
+  ['SUBDUCTION', 'Geologic process', 'One plate sinks beneath another', 'Often creates deep ocean trenches'],
+  ['PRECIPITATION', 'Weather term', 'Water falling from clouds', 'Includes rain, snow, and hail'],
+  ['MONSOON', 'Weather pattern', 'Seasonal shift in wind', 'Brings heavy rain to South Asia'],
+  ['ARCHIPELAGIC', 'Geographic term', 'Describes island nations', 'Indonesia is a prime example']
+]);
+
+/* ---------------------------- HISTORY ---------------------------- */
+addWords('history', 'easy', [
+  ['PYRAMID', 'Ancient structure', 'Built by the Egyptians', 'A tomb for pharaohs'],
+  ['CASTLE', 'Structure', 'Home to royalty', 'Often has a moat'],
+  ['KNIGHT', 'Historical figure', 'Wore armor', 'Served a king or lord'],
+  ['EMPIRE', 'Political term', 'Ruled by an emperor', 'The Roman one was huge'],
+  ['TREATY', 'Historical document', 'Ends a conflict', 'Signed by nations'],
+  ['COLONY', 'Historical term', 'Controlled by another country', 'America once had thirteen'],
+  ['REVOLUTION', 'Historical event', 'A major uprising', 'Often overthrows a government'],
+  ['MONARCH', 'Ruler', 'Wears a crown', 'Rules a kingdom'],
+  ['ARTIFACT', 'Historical object', 'Made by humans long ago', 'Found by archaeologists'],
+  ['DYNASTY', 'Ruling family', 'Passes power through generations', 'Ancient China had many']
+]);
+addWords('history', 'medium', [
+  ['RENAISSANCE', 'Historical period', 'A rebirth of art and learning', 'Began in Italy'],
+  ['COLONIZATION', 'Historical process', 'Settling a foreign land', 'Often exploited native peoples'],
+  ['INDEPENDENCE', 'Historical concept', 'Freedom from another power', 'Celebrated with a national holiday'],
+  ['ARISTOCRACY', 'Social class', 'The ruling elite', 'Held power through inherited titles'],
+  ['CONQUISTADOR', 'Historical figure', 'Spanish conqueror', 'Explored the Americas'],
+  ['FEUDALISM', 'Social system', 'Based on land for loyalty', 'Common in medieval Europe'],
+  ['INQUISITION', 'Historical institution', 'Investigated religious heresy', 'Feared for its tribunals'],
+  ['ARMISTICE', 'Historical term', 'A temporary ceasefire', 'Ended World War One fighting'],
+  ['EMANCIPATION', 'Historical process', 'Freedom from slavery', 'Declared by a famous proclamation'],
+  ['PARLIAMENT', 'Governing body', 'Makes laws for a nation', 'Britain\'s is centuries old']
+]);
+addWords('history', 'hard', [
+  ['HIEROGLYPHICS', 'Ancient writing', 'Used symbols and pictures', 'Found on Egyptian tombs'],
+  ['MESOPOTAMIA', 'Ancient region', 'Between two rivers', 'Cradle of civilization'],
+  ['ABSOLUTISM', 'Political system', 'Total power in one ruler', 'Practiced by many European kings'],
+  ['ANNEXATION', 'Historical process', 'Formally adding territory', 'Often done by force'],
+  ['PROTECTORATE', 'Political status', 'Controlled but not fully annexed', 'A form of indirect rule'],
+  ['ISOLATIONISM', 'Political stance', 'Avoiding foreign entanglements', 'A policy some nations followed'],
+  ['REPARATIONS', 'Historical term', 'Payment for wartime damage', 'Demanded after major conflicts'],
+  ['SUFFRAGETTE', 'Historical figure', 'Fought for voting rights', 'Active in the early 1900s'],
+  ['CONFEDERACY', 'Political union', 'A group of allied states', 'Formed during the American Civil War'],
+  ['PARTITION', 'Historical event', 'Division of a territory', 'India experienced one in 1947']
+]);
+
+/* ---------------------------- SPORTS ---------------------------- */
+addWords('sports', 'easy', [
+  ['SOCCER', 'Sport', 'Played with a round ball', 'Called football outside the US'],
+  ['TENNIS', 'Sport', 'Played with a racket', 'Uses a net and court'],
+  ['HOCKEY', 'Sport', 'Played on ice or field', 'Uses a stick and puck'],
+  ['BOXING', 'Sport', 'Fought with fists', 'Happens in a ring'],
+  ['SWIMMING', 'Sport', 'Done in water', 'Has different strokes'],
+  ['CYCLING', 'Sport', 'Done on two wheels', 'The Tour de France features it'],
+  ['GOLF', 'Sport', 'Played with clubs', 'Ball goes into a hole'],
+  ['WRESTLING', 'Sport', 'Grappling combat', 'Aims to pin an opponent'],
+  ['ARCHERY', 'Sport', 'Uses a bow', 'Aims at a target'],
+  ['ROWING', 'Sport', 'Done in a boat', 'Uses oars']
+]);
+addWords('sports', 'medium', [
+  ['MARATHON', 'Running event', 'Over 26 miles long', 'Named after a Greek battle'],
+  ['GYMNASTICS', 'Sport', 'Requires flexibility and balance', 'Includes the balance beam'],
+  ['BADMINTON', 'Sport', 'Played with a shuttlecock', 'Uses a lightweight racket'],
+  ['TRIATHLON', 'Sport', 'Combines three disciplines', 'Includes swimming, cycling, and running'],
+  ['LACROSSE', 'Sport', 'Uses a netted stick', 'Originated with Native Americans'],
+  ['DECATHLON', 'Athletic event', 'Ten different events', 'Tests all-around ability'],
+  ['SNOWBOARDING', 'Winter sport', 'Done on a single board', 'Popular at the Winter Olympics'],
+  ['WEIGHTLIFTING', 'Sport', 'Lifts heavy barbells', 'Includes the clean and jerk'],
+  ['FENCING', 'Sport', 'Combat with swords', 'Wears a protective mask'],
+  ['CURLING', 'Winter sport', 'Slides stones on ice', 'Uses brooms to sweep']
+]);
+addWords('sports', 'hard', [
+  ['BIATHLON', 'Winter sport', 'Combines skiing and shooting', 'Requires steady nerves after exertion'],
+  ['STEEPLECHASE', 'Running event', 'Includes barriers and a water jump', 'A grueling distance race'],
+  ['PENTATHLON', 'Athletic event', 'Combines five disciplines', 'Includes fencing and swimming'],
+  ['DRESSAGE', 'Equestrian sport', 'Horse performs precise movements', 'Often called horse ballet'],
+  ['SHOT-PUT', 'Track and field event', 'Throws a heavy metal ball', 'Thrown from a small circle'],
+  ['BOBSLED', 'Winter sport', 'A team races down an icy track', 'Uses a steerable sled'],
+  ['POLO', 'Sport', 'Played on horseback', 'Uses a long mallet'],
+  ['SEPAK-TAKRAW', 'Sport', 'Uses feet instead of hands', 'Popular in Southeast Asia'],
+  ['LUGE', 'Winter sport', 'Feet-first sledding', 'One of the fastest sports on ice'],
+  ['KABADDI', 'Contact sport', 'Played while holding your breath', 'Popular across South Asia']
+]);
+
+/* ---------------------------- MOVIES ---------------------------- */
+addWords('movies', 'easy', [
+  ['ACTOR', 'Film role', 'Performs in a movie', 'Can win an Oscar'],
+  ['DIRECTOR', 'Film role', 'Guides the making of a film', 'Sits in the director\'s chair'],
+  ['SCREEN', 'Movie equipment', 'Shows the picture', 'Found in a theater'],
+  ['SEQUEL', 'Film term', 'Follows an earlier movie', 'Continues the story'],
+  ['TRAILER', 'Film term', 'A short preview', 'Shown before the main feature'],
+  ['ANIMATION', 'Film genre', 'Drawn or computer generated', 'Pixar makes these'],
+  ['COMEDY', 'Film genre', 'Meant to make you laugh', 'Often has a happy ending'],
+  ['SUBTITLE', 'Film feature', 'Translated text on screen', 'Helps understand foreign dialogue'],
+  ['POPCORN', 'Theater snack', 'Eaten while watching movies', 'Often salty or buttery'],
+  ['CAMEO', 'Film term', 'A brief celebrity appearance', 'Often a fun surprise']
+]);
+addWords('movies', 'medium', [
+  ['SCREENPLAY', 'Film document', 'Contains dialogue and scenes', 'Written by a screenwriter'],
+  ['SOUNDTRACK', 'Film element', 'The music of a movie', 'Can win its own award'],
+  ['BLOCKBUSTER', 'Film term', 'A huge commercial success', 'Often released in summer'],
+  ['CINEMATOGRAPHY', 'Film craft', 'The art of camera work', 'Shapes how a film looks'],
+  ['PROTAGONIST', 'Film term', 'The main character', 'The story follows them'],
+  ['STORYBOARD', 'Planning tool', 'Sketches out each scene', 'Used before filming begins'],
+  ['DOCUMENTARY', 'Film genre', 'Based on real events', 'Aims to inform the viewer'],
+  ['FRANCHISE', 'Film term', 'A series of related movies', 'Marvel is a huge one'],
+  ['NARRATOR', 'Film role', 'Tells the story out loud', 'Often unseen on screen'],
+  ['PREMIERE', 'Film event', 'The first public showing', 'Often has a red carpet']
+]);
+addWords('movies', 'hard', [
+  ['MISE-EN-SCENE', 'Film term', 'Everything visible in a shot', 'French for "placing on stage"'],
+  ['DENOUEMENT', 'Story term', 'The final resolution', 'Comes after the climax'],
+  ['SOUNDSTAGE', 'Production location', 'A large indoor filming space', 'Used to build elaborate sets'],
+  ['CHOREOGRAPHY', 'Film craft', 'Planned movement seque  { word: "ATOM", category: "Science", difficulty: "Easy", hints: ["Basic unit of matter", "Contains protons and neutrons", "Combines to form molecules"] },
   { word: "GRAVITY", category: "Science", difficulty: "Easy", hints: ["Pulls objects toward Earth", "Discovered by Isaac Newton", "Keeps planets in orbit"] },
   { word: "OXYGEN", category: "Science", difficulty: "Easy", hints: ["Gas required for human breathing", "Atomic number 8", "Makes up 21% of atmosphere"] },
   { word: "PHOTOSYNTHESIS", category: "Science", difficulty: "Medium", hints: ["Plant energy production", "Uses sunlight and CO2", "Produces oxygen as byproduct"] },
